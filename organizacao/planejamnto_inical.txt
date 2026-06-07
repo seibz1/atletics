@@ -1,0 +1,50 @@
+Dia 1: A Ingestão e Sanitização da Base (Seu foco de hoje)
+Objetivo: Criar as funções separadas para ler e limpar o arquivo das Olimpíadas,
+ garantindo o Princípio da Responsabilidade Única.
+Ação Prática: Escrever carregar_dados() e limpar_dados() no processamento_dados.py. 
+Filtrar as colunas essenciais, remover duplicatas e forçar a conversão de PIB e População para numérico.
+===========================================OKAY===================================================================
+
+===========================================LOADING===================================================================
+Dia 2: O Domínio do Clima e o "Grande Merge"
+Objetivo: Processar aquele arquivo histórico gigante de temperaturas e cruzar as informações com
+ a nossa tabela limpa de atletas.
+
+Ação Prática: 
+1. Criar a sua segunda função especialista: tratar_clima(df). Como esse arquivo tem dados desde 1743,
+você vai usar o Pandas para filtrar apenas um período recente (ex: de 2000 a 2013) e tirar a temperatura média de cada país.
+
+2. Tratar os nomes dos países que não baterem (ex: "US" em uma tabela e "United States" na outra).
+
+3. Usar a função pd.merge() no seu "Orquestrador" para colar as duas tabelas lado a lado usando o nome do país como chave.
+===========================================LOADING===================================================================
+Dia 3: A Nova Engenharia de Features e Agrupamentos
+Objetivo: Criar as métricas de pontuação e usar as suas novas colunas (event_part_of, idade_atleta, sex_or_gender) para extrair respostas complexas.
+
+Ação Prática:
+
+Criar a coluna de Score Olímpico (Ouro=3, Prata=2, Bronze=1).
+
+Usar o groupby do Pandas para criar visões agregadas:
+
+Visão 1: Qual a temperatura média dos países com maior Score Total?
+
+Visão 2: Existe diferença na média de idade dos medalhistas de esportes de explosão (100m) vs resistência (Maratona) agrupado por país quente/frio?
+===========================================LOADING===================================================================
+Dia 4: A Vitrine Visual (Streamlit + Matplotlib/Plotly)
+Objetivo: Tirar os dados do terminal escuro do VS Code e construir uma interface web interativa.
+
+Ação Prática: 1. Montar o arquivo app.py.
+2. Criar um Gráfico de Dispersão (Scatter Plot) cruzando Temperatura Média (Eixo X) com Score Olímpico (Eixo Y).
+3. Já que você incluiu as colunas lat (Latitude) e lon (Longitude), vamos colocar um Mapa Interativo na tela plotando os países com mais medalhas e usando cores quentes/frias para representar o clima.
+===========================================LOADING===================================================================
+Dia 5: Polimento Profissional e o Relatório Final
+Objetivo: Fechar a nota máxima garantindo que o sistema seja dinâmico e o relatório seja irrefutável.
+
+Ação Prática:
+
+Adicionar Filtros Laterais na sua interface web (ex: "Filtrar por Gênero", "Selecionar Tipo de Evento"). Isso vai deixar o professor brincar com os dados.
+
+Tirar capturas de tela dos cenários mais interessantes que você descobriu (ex: "Países frios dominam os esportes de força e países quentes dominam velocidade").
+
+Anexar essas provas visuais no PDF e escrever a conclusão mostrando a relação entre PIB, Clima, Idade e Sucesso Olímpico.
