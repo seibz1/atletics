@@ -1,41 +1,67 @@
 import pandas as pd
 import numpy as np
 
-# função generica que carrega os dados
-def carregar_dados(caminho_arquivo):
-    df = pd.read_csv(caminho_arquivo)
-    return df   #pandas lê o arquivo e retorna na variavel
+# --- 1. FUNÇÕES DE LEITURA (Acesso a Dados) ---
+def carregar_csvs(pasta="dados/"):
+    """Responsável apenas por ler os arquivos do disco."""
+    dfs = {
+        'athletes': pd.read_csv(pasta + "Olympic_Athlete_Event_Details.csv"),
+        'bio': pd.read_csv(pasta + "Olympic_Athlete_Biography.csv"),
+        'countries': pd.read_csv(pasta + "Olympic_Country_Profiles.csv"),
+        'hdi': pd.read_csv(pasta + "Human Development Index - Full.csv"),
+        'pop': pd.read_csv(pasta + "countries of the world.csv"),
+        'clima': pd.read_csv(pasta + "GlobalLandTemperaturesByCountry.csv"),
+        'games': pd.read_csv(pasta + "Olympic_Games_Summary.csv")
+    }
+    return dfs
 
-# função generica que limpa as linhas nulas
-def limpeza(df):
-  df_limpo = df.dropna(how='all')
-  return df_limpo #pandas remove linhas onde todas as colunas estao vazias
-
-# função especifica que limpa os dados dos atletas
-def limpeza_atletas(df):
-   
-    colunas_interesse = [
-        'medalist_name', 'medal', 'date_of_birth', 'sex_or_gender', 
-        'country_medal', 'place_of_birth', 'sport', 'event_part_of', 
-        'lat', 'lon', 'nuts2_population', 'nuts2_gdp'
-    ]
-    df = df[colunas_interesse] # selecionando as colunas que vão ser usadas e descartando o resto
+# --- 2. FUNÇÕES DE LIMPEZA E ENGENHARIA DE DADOS (Business Logic) ---
+def limpar_dados_socioeconomicos(df_hdi, df_pop, df_clima):
+    """Filtra, limpa nulos e padroniza as bases socioeconômicas."""
+    # IDH: Pegar apenas 2021 e remover nulos
+    hdi_clean = df_hdi[['ISO3', 'Country', 'Human Development Index (2021)']].dropna()
+    hdi_clean = hdi_clean.rename(columns={'Human Development Index (2021)': 'IDH'})
     
-    df = df.drop_duplicates() #remove a linha apenas se for exatamente igual a outra
+    # População
+    pop_clean = df_pop[['Country', 'Population']].dropna()
     
-    df['nuts2_population'] = pd.to_numeric(df['nuts2_population'], errors='coerce')
-    df['nuts2_gdp'] = pd.to_numeric(df['nuts2_gdp'], errors='coerce') #padronizando os dados idh e populacao
+    # Clima: Agrupar média histórica por país
+    clima_clean = df_clima.groupby('Country')['AverageTemperature'].mean().reset_index()
+    clima_clean = clima_clean.rename(columns={'AverageTemperature': 'Clima_Medio'})
     
-    ano_nascimento = pd.to_datetime(df['date_of_birth'], errors='coerce').dt.year #padronizandoa a data de nascimento em ano
-    df['idade_atleta'] = 2024 - ano_nascimento
-    df = df.drop(columns=['date_of_birth']) #deletando as colunas que não vão ser ultilizadas
-    return df
+    return hdi_clean, pop_clean, clima_clean
 
+def limpar_dados_atletas(df_athletes, df_bio, df_games):
+    """Remove colunas redundantes e cruza dados vitais dos atletas com as edições."""
+    # Remover colunas que causam conflito
+    bio_clean = df_bio.drop(columns=['country_noc', 'country'], errors='ignore')
+    
+    # Merge Atleta + Biografia
+    df_merged = pd.merge(df_athletes, bio_clean, on='athlete_id', how='inner')
+    
+    # Adicionar o Ano da Edição
+    games_clean = df_games[['edition_id', 'year']]
+    df_merged = pd.merge(df_merged, games_clean, on='edition_id', how='left')
+    
+    return df_merged
 
-def limpeza_clima(df):
-    df['Ano'] = pd.to_datetime(df['dt'], errors='coerce').dt.year #convertendo a data em ano 
-    df = df[(df['Ano'] >= 2000) & (df['Ano'] <= 2013)] #separando somente os dados relevantes e excluindo o resto
-    df = df.drop(columns=['dt'])
-
-    df = df.groupby('Country')['AverageTemperature'].mean().reset_index()
-    return df
+# --- 3. ORQUESTRADOR PRINCIPAL ---
+def obter_dataset_consolidado():
+    """Função principal que orquestra a pipeline de dados."""
+    dfs = carregar_csvs()
+    
+    # Limpezas isoladas
+    hdi, pop, clima = limpar_dados_socioeconomicos(dfs['hdi'], dfs['pop'], dfs['clima'])
+    atletas_base = limpar_dados_atletas(dfs['athletes'], dfs['bio'], dfs['games'])
+    
+    # Consolidação Final
+    df_master = pd.merge(atletas_base, dfs['countries'], left_on='country_noc', right_on='noc', how='left')
+    df_master = pd.merge(df_master, hdi, left_on='country', right_on='Country', how='left')
+    df_master = pd.merge(df_master, pop, left_on='country', right_on='Country', how='left')
+    df_master = pd.merge(df_master, clima, left_on='country', right_on='Country', how='left')
+    
+    # Engenharia de Features: Manter apenas medalhistas e converter tipos
+    df_master = df_master.dropna(subset=['medal'])
+    df_master['year'] = df_master['year'].fillna(0).astype(int)
+    
+    return df_master

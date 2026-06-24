@@ -1,84 +1,92 @@
-import pandas as pd
-import numpy as np
 import streamlit as st
+import pandas as pd
+import processamento_dados as pdados
+import graficos as graf
 
-# ==========================================
-# 1. FUNÇÕES (A máquina precisa ser construída primeiro)
-# ==========================================
+st.set_page_config(page_title="Dashboard Olímpico Avançado", layout="wide")
 
-# função generica que carrega os dados
-def carregar_dados(caminho_arquivo):
-    df = pd.read_csv(caminho_arquivo)
-    return df   #pandas lê o arquivo e retorna na variavel
+@st.cache_data
+def load_data():
+    return pdados.obter_dataset_consolidado()
 
-# função generica que limpa as linhas nulas
-def limpeza(df):
-    df_limpo = df.dropna(how='all')
-    return df_limpo #pandas remove linhas onde todas as colunas estao vazias
+try:
+    df_master = load_data()
+except Exception as e:
+    st.error(f"Erro ao carregar dados: {e}")
+    st.stop()
 
-# função especifica que limpa os dados dos atletas
-def limpeza_atletas(df):
-    colunas_interesse = [
-        'medalist_name', 'medal', 'date_of_birth', 'sex_or_gender', 
-        'country_medal', 'place_of_birth', 'sport', 'event_part_of', 
-        'lat', 'lon', 'nuts2_population', 'nuts2_gdp'
-    ]
-    df = df[colunas_interesse] # selecionando as colunas que vão ser usadas e descartando o resto
+# --- BARRA LATERAL (FILTRO DE TEMPO) ---
+st.sidebar.title("Máquina do Tempo ⏳")
+st.sidebar.markdown("Este filtro afeta o projeto inteiro.")
+anos_disponiveis = ["Todas as Edições"] + sorted(df_master[df_master['year'] > 0]['year'].unique().tolist(), reverse=True)
+ano_selecionado = st.sidebar.selectbox("Selecione a Edição (Ano):", anos_disponiveis)
+
+if ano_selecionado != "Todas as Edições":
+    df_ano = df_master[df_master['year'] == ano_selecionado]
+else:
+    df_ano = df_master
+
+st.title("Análise Olímpica Interativa 🏅")
+aba_geral, aba_pais = st.tabs(["🌍 Visão Global (Por Esporte)", "🔎 Raio-X Nacional (Por País e Atleta)"])
+
+# --- ABA 1: VISÃO GLOBAL ---
+with aba_geral:
+    # Filtro específico da Aba 1
+    modalidades_globais = sorted(df_ano['sport'].dropna().unique())
+    mod_selecionada = st.selectbox("Selecione a Modalidade para analisar o mundo:", modalidades_globais, key='mod_global')
     
-    df = df.drop_duplicates() #remove a linha apenas se for exatamente igual a outra
+    df_mod = df_ano[df_ano['sport'] == mod_selecionada]
     
-    df['nuts2_population'] = pd.to_numeric(df['nuts2_population'], errors='coerce')
-    df['nuts2_gdp'] = pd.to_numeric(df['nuts2_gdp'], errors='coerce') #padronizando os dados idh e populacao
+    col_mapa, col_rank = st.columns([3, 2])
+    with col_mapa:
+        fig_mapa = graf.plotar_mapa_mundi(df_mod)
+        st.plotly_chart(fig_mapa, use_container_width=True)
     
-    ano_nascimento = pd.to_datetime(df['date_of_birth'], errors='coerce').dt.year #padronizando a data de nascimento em ano
-    df['idade_atleta'] = 2024 - ano_nascimento
-    df = df.drop(columns=['date_of_birth']) #deletando as colunas que não vão ser ultilizadas
-    return df
+    with col_rank:
+        st.write("") 
+        fig_rank = graf.plotar_ranking_top10(df_mod)
+        st.pyplot(fig_rank)
 
-def limpeza_clima(df):
-    df['Ano'] = pd.to_datetime(df['dt'], errors='coerce').dt.year #convertendo a data em ano 
-    df = df[(df['Ano'] >= 2000) & (df['Ano'] <= 2013)] #separando somente os dados relevantes e excluindo o resto
-    df = df.drop(columns=['dt'])
-    df = df.groupby('Country')['AverageTemperature'].mean().reset_index()
-    return df
+# --- ABA 2: RAIO-X DO PAÍS (DRILL-DOWN DE ATLETAS) ---
+with aba_pais:
+    paises_medalhistas = sorted(df_ano['country'].dropna().unique())
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        # 1º Passo: Escolher o País
+        pais_selecionado = st.selectbox("1. Selecione o País:", paises_medalhistas)
+        df_pais = df_ano[df_ano['country'] == pais_selecionado]
+        
+    with col_f2:
+        # 2º Passo: Escolher um esporte que ESSE país tem medalha
+        mods_do_pais = sorted(df_pais['sport'].dropna().unique())
+        mod_pais_selecionada = st.selectbox("2. Esporte com medalha (Filtra a Tabela abaixo):", mods_do_pais)
+        
+    # Aplicando o duplo filtro
+    df_pais_mod = df_pais[df_pais['sport'] == mod_pais_selecionada]
 
-
-# ==========================================
-# 2. RODANDO A MÁQUINA (Agora que as funções existem, usamos elas)
-# ==========================================
-
-st.title("Painel de Teste de Dados 🚀")
-
-# Dados do Clima
-df_clima_bruto = carregar_dados("GlobalLandTemperaturesByCountry.csv")
-df_clima_limpo = limpeza_clima(df_clima_bruto)
-
-# Dados dos Atletas
-df_atletas_bruto = carregar_dados("2024_medalists_all.csv") 
-df_atletas_limpo = limpeza_atletas(df_atletas_bruto)
-
-
-# ==========================================
-# 3. MOSTRANDO NA TELA
-# ==========================================
-
-st.subheader("🌍 Dados de Clima (Tratados)")
-st.dataframe(df_clima_limpo.head(10))
-
-st.subheader("🏃 Dados dos Atletas (Tratados)")
-st.dataframe(df_atletas_limpo.head(10))
-
-
-# ==========================================
-# 4. O MODO DETETIVE (ÚLTIMA COISA DO ARQUIVO!)
-# ==========================================
-
-st.subheader("🔍 Modo Detetive: Países que não bateram")
-
-paises_atletas = set(df_atletas_limpo['country_medal'].dropna().unique())
-paises_clima = set(df_clima_limpo['Country'].dropna().unique())
-
-paises_problematicos = paises_atletas - paises_clima
-
-# Mostra na tela os países da tabela de atletas que precisam ter o nome traduzido!
-st.write(paises_problematicos)
+    st.subheader(f"Indicadores Nacionais: {pais_selecionado}")
+    dados_sociais = df_pais.iloc[0]
+    
+    c1, c2, c3, c4 = st.columns(4)
+    # A métrica geral mostra o total do país na Olimpíada inteira
+    c1.metric("🏅 Medalhas do País (Total)", df_pais.drop_duplicates(subset=['edition_id', 'event', 'medal']).shape[0])
+    c2.metric("📊 IDH", round(dados_sociais['IDH'], 3) if pd.notna(dados_sociais['IDH']) else "N/A")
+    c3.metric("👥 População", f"{dados_sociais['Population']:,.0f}".replace(',', '.') if pd.notna(dados_sociais['Population']) else "N/A")
+    c4.metric("🌡️ Clima Médio", f"{dados_sociais['Clima_Medio']:.1f} °C" if pd.notna(dados_sociais['Clima_Medio']) else "N/A")
+    
+    st.divider()
+    
+    # Foco total no atleta individual do esporte selecionado
+    col_tabela, col_biotipo = st.columns([1, 1])
+    
+    with col_tabela:
+        st.subheader(f"Atletas de {mod_pais_selecionada}")
+        df_tabela = df_pais_mod[['athlete', 'year', 'event', 'medal', 'height', 'weight']].drop_duplicates()
+        df_tabela.columns = ['Nome', 'Ano', 'Categoria', 'Medalha', 'Altura(cm)', 'Peso(kg)']
+        st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+        
+    with col_biotipo:
+        st.subheader("Perfil Físico dos Campeões")
+        fig_biotipo = graf.plotar_biotipo_atletas(df_pais_mod)
+        st.pyplot(fig_biotipo)
