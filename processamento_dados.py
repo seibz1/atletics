@@ -1,67 +1,80 @@
 import pandas as pd
 import numpy as np
 
-# --- 1. FUNÇÕES DE LEITURA (Acesso a Dados) ---
+# função de leitura dos arquivos, pegando por padrao na pasta dados
 def carregar_csvs(pasta="dados/"):
-    """Responsável apenas por ler os arquivos do disco."""
     dfs = {
-        'athletes': pd.read_csv(pasta + "Olympic_Athlete_Event_Details.csv"),
-        'bio': pd.read_csv(pasta + "Olympic_Athlete_Biography.csv"),
-        'countries': pd.read_csv(pasta + "Olympic_Country_Profiles.csv"),
-        'hdi': pd.read_csv(pasta + "Human Development Index - Full.csv"),
-        'pop': pd.read_csv(pasta + "countries of the world.csv"),
+        'atletas': pd.read_csv(pasta + "Olympic_Athlete_Event_Details.csv"),
+        'biografia': pd.read_csv(pasta + "Olympic_Athlete_Biography.csv"),
+        'paises': pd.read_csv(pasta + "Olympic_Country_Profiles.csv"),
+        'idh': pd.read_csv(pasta + "Human Development Index - Full.csv"),
+        'populacao': pd.read_csv(pasta + "countries of the world.csv"),
         'clima': pd.read_csv(pasta + "GlobalLandTemperaturesByCountry.csv"),
-        'games': pd.read_csv(pasta + "Olympic_Games_Summary.csv")
+        'jogos': pd.read_csv(pasta + "Olympic_Games_Summary.csv")
     }
     return dfs
 
-# --- 2. FUNÇÕES DE LIMPEZA E ENGENHARIA DE DADOS (Business Logic) ---
-def limpar_dados_socioeconomicos(df_hdi, df_pop, df_clima):
-    """Filtra, limpa nulos e padroniza as bases socioeconômicas."""
-    # IDH: Pegar apenas 2021 e remover nulos
-    hdi_clean = df_hdi[['ISO3', 'Country', 'Human Development Index (2021)']].dropna()
-    hdi_clean = hdi_clean.rename(columns={'Human Development Index (2021)': 'IDH'})
+#funcao de limpeza
+def limpar_dados_socioeconomicos(df_idh, df_populacao, df_clima):
+    # limpando o idh 
+    idh_limpo = df_idh[['ISO3', 'Country', 'Human Development Index (2021)']].dropna()
+    idh_limpo = idh_limpo.rename(columns={'Human Development Index (2021)': 'IDH'})
     
-    # População
-    pop_clean = df_pop[['Country', 'Population']].dropna()
+    #  limpando população
+    populacao_limpa = df_populacao[['Country', 'Population']].dropna()
     
-    # Clima: Agrupar média histórica por país
-    clima_clean = df_clima.groupby('Country')['AverageTemperature'].mean().reset_index()
-    clima_clean = clima_clean.rename(columns={'AverageTemperature': 'Clima_Medio'})
+    # pegando media e ajustando dados do clima
+    clima_limpo = df_clima.groupby('Country')['AverageTemperature'].mean().reset_index()
+    clima_limpo = clima_limpo.rename(columns={'AverageTemperature': 'Clima_Medio'})
     
-    return hdi_clean, pop_clean, clima_clean
+    return idh_limpo, populacao_limpa, clima_limpo
 
-def limpar_dados_atletas(df_athletes, df_bio, df_games):
-    """Remove colunas redundantes e cruza dados vitais dos atletas com as edições."""
-    # Remover colunas que causam conflito
-    bio_clean = df_bio.drop(columns=['country_noc', 'country'], errors='ignore')
-    
-    # Merge Atleta + Biografia
-    df_merged = pd.merge(df_athletes, bio_clean, on='athlete_id', how='inner')
-    
-    # Adicionar o Ano da Edição
-    games_clean = df_games[['edition_id', 'year']]
-    df_merged = pd.merge(df_merged, games_clean, on='edition_id', how='left')
-    
-    return df_merged
+#limpando e mesclando os dados dos atletas/jogos
+def limpar_dados_atletas(df_atletas, df_biografia, df_jogos):
 
-# --- 3. ORQUESTRADOR PRINCIPAL ---
+    biografia_limpa = df_biografia.drop(columns=['country_noc', 'country'], errors='ignore')
+    
+    # mesclando atleta e biografia
+    df_mesclado = pd.merge(df_atletas, biografia_limpa, on='athlete_id', how='inner')
+    
+    # adicionando o ano da edição
+    jogos_limpo = df_jogos[['edition_id', 'year']]
+    df_mesclado = pd.merge(df_mesclado, jogos_limpo, on='edition_id', how='left')
+    
+    return df_mesclado
+
+# rodando e dando ajustes finais
 def obter_dataset_consolidado():
-    """Função principal que orquestra a pipeline de dados."""
     dfs = carregar_csvs()
     
-    # Limpezas isoladas
-    hdi, pop, clima = limpar_dados_socioeconomicos(dfs['hdi'], dfs['pop'], dfs['clima'])
-    atletas_base = limpar_dados_atletas(dfs['athletes'], dfs['bio'], dfs['games'])
+    # limpezas isoladas
+    idh, populacao, clima = limpar_dados_socioeconomicos(dfs['idh'], dfs['populacao'], dfs['clima'])
+    atletas_base = limpar_dados_atletas(dfs['atletas'], dfs['biografia'], dfs['jogos'])
     
-    # Consolidação Final
-    df_master = pd.merge(atletas_base, dfs['countries'], left_on='country_noc', right_on='noc', how='left')
-    df_master = pd.merge(df_master, hdi, left_on='country', right_on='Country', how='left')
-    df_master = pd.merge(df_master, pop, left_on='country', right_on='Country', how='left')
-    df_master = pd.merge(df_master, clima, left_on='country', right_on='Country', how='left')
+    # construindo tabela final
+    df_principal = pd.merge(atletas_base, dfs['paises'], left_on='country_noc', right_on='noc', how='left')
+    df_principal = pd.merge(df_principal, idh, left_on='country', right_on='Country', how='left')
+    df_principal = pd.merge(df_principal, populacao, left_on='country', right_on='Country', how='left')
+    df_principal = pd.merge(df_principal, clima, left_on='country', right_on='Country', how='left')
     
-    # Engenharia de Features: Manter apenas medalhistas e converter tipos
-    df_master = df_master.dropna(subset=['medal'])
-    df_master['year'] = df_master['year'].fillna(0).astype(int)
+    # manter medalhistas e converter tipos
+    df_principal = df_principal.dropna(subset=['medal'])
+    df_principal['year'] = df_principal['year'].fillna(0).astype(int)
     
-    return df_master
+    # traduzindo os dados pra pt
+    df_principal = df_principal.rename(columns={
+        'year': 'ano',
+        'sport': 'esporte',
+        'country': 'pais',
+        'edition_id': 'id_edicao',
+        'event': 'evento',
+        'medal': 'medalha',
+        'height': 'altura',
+        'weight': 'peso',
+        'athlete': 'atleta',
+        'country_noc': 'noc_pais',
+        'Population': 'populacao',
+        'Clima_Medio': 'clima_medio'
+    })
+    
+    return df_principal

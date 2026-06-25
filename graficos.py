@@ -15,12 +15,12 @@ def _aplicar_tema_escuro(ax):
 
 def plotar_mapa_mundi(df_filtrado):
     """Gera um GLOBO 3D interativo de medalhas"""
-    df_eventos = df_filtrado.drop_duplicates(subset=['edition_id', 'event', 'country_noc', 'medal'])
-    df_mapa = df_eventos.groupby(['country', 'ISO3'])['medal'].count().reset_index()
+    df_eventos = df_filtrado.drop_duplicates(subset=['id_edicao', 'evento', 'noc_pais', 'medalha'])
+    df_mapa = df_eventos.groupby(['pais', 'ISO3'])['medalha'].count().reset_index()
     
     # Criando o Globo
     fig = px.choropleth(
-        df_mapa, locations="ISO3", color="medal", hover_name="country",
+        df_mapa, locations="ISO3", color="medalha", hover_name="pais",
         color_continuous_scale="Plasma", # Cores neon/vibrantes
         title="Globo de Domínio (Gire com o mouse)"
     )
@@ -42,8 +42,8 @@ def plotar_mapa_mundi(df_filtrado):
     return fig
 
 def plotar_ranking_top10(df_filtrado):
-    df_eventos = df_filtrado.drop_duplicates(subset=['edition_id', 'event', 'country_noc', 'medal'])
-    ranking = df_eventos['country'].value_counts().nlargest(10).sort_values()
+    df_eventos = df_filtrado.drop_duplicates(subset=['id_edicao', 'evento', 'noc_pais', 'medalha'])
+    ranking = df_eventos['pais'].value_counts().nlargest(10).sort_values()
     
     fig, ax = plt.subplots(figsize=(8, 5), facecolor='#0E1117')
     ax.set_facecolor('#0E1117')
@@ -57,12 +57,12 @@ def plotar_ranking_top10(df_filtrado):
     return fig
 
 def plotar_biotipo_atletas(df_pais):
-    df_fisico = df_pais.dropna(subset=['height', 'weight'])
+    df_fisico = df_pais.dropna(subset=['altura', 'peso'])
     
     fig, ax = plt.subplots(figsize=(8, 5), facecolor='#0E1117')
     ax.set_facecolor('#0E1117')
     
-    ax.scatter(df_fisico['weight'], df_fisico['height'], alpha=0.7, c='#FFD700', edgecolors='white')
+    ax.scatter(df_fisico['peso'], df_fisico['altura'], alpha=0.7, c='#FFD700', edgecolors='white')
     ax.set_title('Biotipo dos Medalhistas (Peso x Altura)', pad=15)
     ax.set_xlabel('Peso (kg)')
     ax.set_ylabel('Altura (cm)')
