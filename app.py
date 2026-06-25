@@ -16,7 +16,7 @@ except Exception as e:
     st.stop()
 
 # --- BARRA LATERAL (FILTRO DE TEMPO) ---
-st.sidebar.title("Máquina do Tempo ⏳")
+st.sidebar.title("Máquina do Tempo ")
 st.sidebar.markdown("Este filtro afeta o projeto inteiro.")
 anos_disponiveis = ["Todas as Edições"] + sorted(df_principal[df_principal['ano'] > 0]['ano'].unique().tolist(), reverse=True)
 ano_selecionado = st.sidebar.selectbox("Selecione a Edição (Ano):", anos_disponiveis)
